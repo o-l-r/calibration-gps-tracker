@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CalibrationGPSTracker — Track Viewer</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0A0A0A;
+    --dark: #1A1A1A;
+    --mid: #2A2A2A;
+    --gray: #888;
+    --light: #CCC;
+    --white: #FAFAFA;
+    --red: #E53935;
+    --yellow: #FDD835;
+    --green: #43A047;
+    --blue: #1E88E5;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--black);
+    color: var(--white);
+  }
+
+  body { display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--dark);
+    border-bottom: 1px solid var(--mid);
+    flex-shrink: 0;
+    z-index: 1000;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .logo-dot {
+    width: 24px; height: 24px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .logo-dot svg { width: 14px; height: 14px; fill: var(--white); }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    height: 36px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:active { opacity: 0.8; }
+  .btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .btn-primary { background: var(--red); color: var(--white); }
+  .btn-secondary { background: var(--mid); color: var(--white); border: 1px solid #444; }
+
+  #fileInput { display: none; }
+
+  /* ── Map ── */
+  #map {
+    flex: 1;
+    z-index: 1;
+  }
+
+  /* ── Info Panel ── */
+  .panel {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    max-width: 400px;
+    background: rgba(26, 26, 26, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid var(--mid);
+    z-index: 1000;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+
+  .panel.hidden { transform: translateY(calc(100% + 32px)); }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--mid);
+    cursor: pointer;
+  }
+
+  .panel-title {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .panel-toggle {
+    width: 28px; height: 28px;
+    border: none; background: transparent;
+    color: var(--gray); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+
+  .panel-toggle:active { background: var(--mid); }
+  .panel-toggle svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .panel-body { padding: 12px 16px; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .stat-item { text-align: center; }
+
+  .stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--gray);
+    margin-top: 1px;
+  }
+
+  .tags-list {
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  .tags-list-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--gray);
+    margin-bottom: 6px;
+  }
+
+  .tag-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mid);
+    cursor: pointer;
+    transition: background 0.1s;
+    border-radius: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .tag-row:hover { background: var(--mid); }
+
+  .tag-badge {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--red);
+    color: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .tag-detail { flex: 1; min-width: 0; }
+
+  .tag-detail-time {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tag-detail-coords {
+    font-size: 11px;
+    color: var(--gray);
+  }
+
+  /* ── Drop Zone ── */
+  .dropzone {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .dropzone.active { display: flex; pointer-events: auto; }
+
+  .dropzone-inner {
+    border: 3px dashed var(--red);
+    border-radius: 24px;
+    padding: 60px 40px;
+    text-align: center;
+  }
+
+  .dropzone-inner svg {
+    width: 48px; height: 48px;
+    fill: var(--red);
+    margin-bottom: 12px;
+  }
+
+  .dropzone-inner p {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .dropzone-inner .sub {
+    font-size: 14px;
+    color: var(--gray);
+    margin-top: 4px;
+  }
+
+  /* ── Empty State ── */
+  .empty-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .empty-card {
+    background: rgba(26,26,26,0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--mid);
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    max-width: 340px;
+    pointer-events: auto;
+  }
+
+  .empty-card svg {
+    width: 48px; height: 48px;
+    fill: var(--mid);
+    margin-bottom: 12px;
+  }
+
+  .empty-card h2 {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .empty-card p {
+    font-size: 14px;
+    color: var(--gray);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  /* ── Layer Switcher ── */
+  .layer-ctrl {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+  }
+
+  .layer-btn {
+    width: 36px; height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(26,26,26,0.9);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid var(--mid);
+    color: var(--white);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .layer-btn:active { background: var(--mid); }
+  .layer-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+  .layer-menu {
+    position: absolute;
+    top: 42px;
+    right: 0;
+    background: rgba(26,26,26,0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--mid);
+    border-radius: 10px;
+    padding: 6px;
+    display: none;
+    min-width: 170px;
+  }
+
+  .layer-menu.open { display: block; }
+
+  .layer-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    color: var(--white);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 6px;
+    width: 100%;
+    text-align: left;
+  }
+
+  .layer-option:hover { background: var(--mid); }
+  .layer-option.active { color: var(--red); font-weight: 600; }
+
+  .layer-option .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 2px solid var(--gray);
+    flex-shrink: 0;
+  }
+
+  .layer-option.active .dot {
+    border-color: var(--red);
+    background: var(--red);
+  }
+
+  /* ── Speed Legend ── */
+  .legend {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    z-index: 1000;
+    background: rgba(26,26,26,0.9);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid var(--mid);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--gray);
+    display: none;
+  }
+
+  .legend.visible { display: block; }
+
+  .legend-title {
+    font-weight: 600;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .legend-bar {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+
+  .legend-labels {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── Leaflet overrides ── */
+  .leaflet-control-zoom a {
+    background: rgba(26,26,26,0.9) !important;
+    color: var(--white) !important;
+    border-color: var(--mid) !important;
+  }
+
+  .leaflet-control-zoom a:hover {
+    background: var(--mid) !important;
+  }
+
+  .tag-marker-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50%;
+    background: var(--red);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: -apple-system, sans-serif;
+    border: 2px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    margin-left: -14px !important;
+    margin-top: -14px !important;
+  }
+
+  .start-marker-icon, .end-marker-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50%;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: -apple-system, sans-serif;
+    border: 2px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    margin-left: -12px !important;
+    margin-top: -12px !important;
+  }
+
+  .start-marker-icon { background: var(--green); }
+  .end-marker-icon { background: var(--black); }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--dark) !important;
+    color: var(--white) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+  }
+
+  .leaflet-popup-tip { background: var(--dark) !important; }
+
+  .leaflet-popup-content {
+    margin: 10px 14px !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+
+  .leaflet-popup-content strong { color: var(--red); }
+
+  .leaflet-popup-close-button {
+    color: var(--gray) !important;
+  }
+
+  @media (min-width: 600px) {
+    .panel { max-width: 360px; bottom: 20px; left: 20px; right: auto; }
+    .legend { bottom: 20px; right: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+    </div>
+    Track Viewer
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-primary" id="btnLoad">
+      <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+      Load JSON
+    </button>
+    <input type="file" id="fileInput" accept=".json,application/json">
+  </div>
+</header>
+
+<div style="position:relative;flex:1;display:flex;flex-direction:column;">
+  <div id="map"></div>
+
+  <!-- Empty state -->
+  <div class="empty-overlay" id="emptyOverlay">
+    <div class="empty-card">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+      <h2>No Track Loaded</h2>
+      <p>Load a CalibrationGPSTracker JSON file to visualize your GPS track on the map.</p>
+      <button class="btn btn-primary" id="btnLoadEmpty">
+        <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+        Choose JSON File
+      </button>
+    </div>
+  </div>
+
+  <!-- Layer switcher -->
+  <div class="layer-ctrl" id="layerCtrl" style="display:none;">
+    <button class="layer-btn" id="btnLayer" title="Map style">
+      <svg viewBox="0 0 24 24"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/></svg>
+    </button>
+    <div class="layer-menu" id="layerMenu"></div>
+  </div>
+
+  <!-- Speed legend -->
+  <div class="legend" id="legend">
+    <div class="legend-title">Speed</div>
+    <div class="legend-bar" id="legendBar"></div>
+    <div class="legend-labels">
+      <span id="legendMin">0</span>
+      <span id="legendMax">0 m/s</span>
+    </div>
+  </div>
+
+  <!-- Info panel -->
+  <div class="panel hidden" id="panel">
+    <div class="panel-header" id="panelHeader">
+      <span class="panel-title" id="panelTitle">Track Info</span>
+      <button class="panel-toggle" id="panelToggle">
+        <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+      </button>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="tags-list" id="tagsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Drop zone -->
+<div class="dropzone" id="dropzone">
+  <div class="dropzone-inner">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+    <p>Drop JSON file here</p>
+    <p class="sub">CalibrationGPSTracker format</p>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════
+   Map Setup
+   ═══════════════════════════════════════ */
+const map = L.map("map", {
+  center: [46.5, 2.5],
+  zoom: 6,
+  zoomControl: true,
+  attributionControl: true,
+});
+
+/* ── Tile Layers ── */
+const layers = {
+  "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }),
+  "Satellite (ESRI)": L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19,
+    attribution: "&copy; Esri, Maxar, Earthstar Geographics",
+  }),
+  "Topo (OpenTopo)": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+    maxZoom: 17,
+    attribution: "&copy; OpenTopoMap",
+  }),
+  "Dark (CartoDB)": L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    maxZoom: 20,
+    attribution: "&copy; CartoDB",
+  }),
+};
+
+let activeLayerName = "OpenStreetMap";
+layers[activeLayerName].addTo(map);
+
+/* ── Layer Switcher ── */
+const layerMenu = document.getElementById("layerMenu");
+const layerCtrl = document.getElementById("layerCtrl");
+
+function buildLayerMenu() {
+  layerMenu.innerHTML = Object.keys(layers).map(name => `
+    <button class="layer-option ${name === activeLayerName ? "active" : ""}" data-layer="${name}">
+      <span class="dot"></span>
+      ${name}
+    </button>
+  `).join("");
+
+  layerMenu.querySelectorAll(".layer-option").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.layer;
+      if (name === activeLayerName) return;
+      map.removeLayer(layers[activeLayerName]);
+      activeLayerName = name;
+      layers[name].addTo(map);
+      layerMenu.classList.remove("open");
+      buildLayerMenu();
+    });
+  });
+}
+
+buildLayerMenu();
+
+document.getElementById("btnLayer").addEventListener("click", () => {
+  layerMenu.classList.toggle("open");
+});
+
+document.addEventListener("click", (e) => {
+  if (!document.getElementById("layerCtrl").contains(e.target)) {
+    layerMenu.classList.remove("open");
+  }
+});
+
+/* ═══════════════════════════════════════
+   Track Layer Group
+   ═══════════════════════════════════════ */
+let trackGroup = L.layerGroup().addTo(map);
+
+/* ═══════════════════════════════════════
+   Color Utilities
+   ═══════════════════════════════════════ */
+function speedColor(speed, minSpeed, maxSpeed) {
+  if (speed == null || maxSpeed <= minSpeed) return "#1E88E5";
+  const t = Math.min(1, Math.max(0, (speed - minSpeed) / (maxSpeed - minSpeed)));
+  // blue → green → yellow → red
+  const r = t < 0.5 ? Math.round(t * 2 * 255) : 255;
+  const g = t < 0.5 ? 255 : Math.round((1 - (t - 0.5) * 2) * 255);
+  const b = t < 0.5 ? Math.round((1 - t * 2) * 200) : 0;
+  return `rgb(${r},${g},${b})`;
+}
+
+function gradientCSS(minSpeed, maxSpeed) {
+  const stops = [];
+  for (let i = 0; i <= 10; i++) {
+    const s = minSpeed + (maxSpeed - minSpeed) * (i / 10);
+    stops.push(speedColor(s, minSpeed, maxSpeed));
+  }
+  return `linear-gradient(to right, ${stops.join(", ")})`;
+}
+
+/* ═══════════════════════════════════════
+   Display Track
+   ═══════════════════════════════════════ */
+function displayTrack(data) {
+  trackGroup.clearLayers();
+
+  const track = data.track || [];
+  const tags = data.tags || [];
+  const meta = data.metadata || {};
+
+  if (track.length === 0) return;
+
+  // Compute speed stats
+  const speeds = track.map(p => p.speed).filter(s => s != null && s > 0);
+  const hasSpeed = speeds.length > 5;
+  const minSpeed = hasSpeed ? Math.min(...speeds) : 0;
+  const maxSpeed = hasSpeed ? Math.max(...speeds) : 0;
+
+  // Draw track as colored polyline segments
+  if (hasSpeed) {
+    for (let i = 0; i < track.length - 1; i++) {
+      const a = track[i], b = track[i + 1];
+      const s = a.speed != null ? a.speed : 0;
+      const color = speedColor(s, minSpeed, maxSpeed);
+      L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
+        color,
+        weight: 4,
+        opacity: 0.9,
+        lineCap: "round",
+      }).addTo(trackGroup);
+    }
+
+    // Legend
+    const legend = document.getElementById("legend");
+    document.getElementById("legendBar").style.background = gradientCSS(minSpeed, maxSpeed);
+    document.getElementById("legendMin").textContent = minSpeed.toFixed(1);
+    document.getElementById("legendMax").textContent = maxSpeed.toFixed(1) + " m/s";
+    legend.classList.add("visible");
+  } else {
+    // Single color track
+    const coords = track.map(p => [p.lat, p.lng]);
+    L.polyline(coords, {
+      color: "#1E88E5",
+      weight: 4,
+      opacity: 0.9,
+      lineCap: "round",
+    }).addTo(trackGroup);
+    document.getElementById("legend").classList.remove("visible");
+  }
+
+  // Accuracy corridor (semi-transparent)
+  const accCoords = track
+    .filter(p => p.accuracy != null && p.accuracy > 0)
+    .map(p => [p.lat, p.lng]);
+  if (accCoords.length > 1) {
+    const avgAcc = track.reduce((s, p) => s + (p.accuracy || 0), 0) / track.length;
+    // Only show corridor if accuracy is meaningful
+    if (avgAcc > 2) {
+      L.polyline(accCoords, {
+        color: "#1E88E5",
+        weight: Math.min(avgAcc * 1.5, 40),
+        opacity: 0.08,
+        lineCap: "round",
+        lineJoin: "round",
+      }).addTo(trackGroup);
+    }
+  }
+
+  // Start / End markers
+  const first = track[0], last = track[track.length - 1];
+
+  L.marker([first.lat, first.lng], {
+    icon: L.divIcon({ className: "start-marker-icon", html: "A" }),
+    zIndexOffset: 900,
+  }).addTo(trackGroup).bindPopup(`<strong>Start</strong><br>${formatTS(first.timestamp)}<br>${first.lat.toFixed(6)}, ${first.lng.toFixed(6)}`);
+
+  L.marker([last.lat, last.lng], {
+    icon: L.divIcon({ className: "end-marker-icon", html: "B" }),
+    zIndexOffset: 900,
+  }).addTo(trackGroup).bindPopup(`<strong>End</strong><br>${formatTS(last.timestamp)}<br>${last.lat.toFixed(6)}, ${last.lng.toFixed(6)}`);
+
+  // Tag markers
+  tags.forEach(tag => {
+    if (tag.lat == null) return;
+    const marker = L.marker([tag.lat, tag.lng], {
+      icon: L.divIcon({ className: "tag-marker-icon", html: String(tag.id) }),
+      zIndexOffset: 1000,
+    }).addTo(trackGroup);
+
+    let popup = `<strong>Tag #${tag.id}</strong><br>${formatTS(tag.timestamp)}<br>${tag.lat.toFixed(6)}, ${tag.lng.toFixed(6)}`;
+    if (tag.alt != null) popup += `<br>Alt: ${tag.alt.toFixed(1)} m`;
+    marker.bindPopup(popup);
+  });
+
+  // Fit bounds
+  const bounds = L.latLngBounds(track.map(p => [p.lat, p.lng]));
+  map.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+
+  // Show panel
+  updatePanel(data);
+  document.getElementById("panel").classList.remove("hidden");
+  layerCtrl.style.display = "";
+  document.getElementById("emptyOverlay").style.display = "none";
+}
+
+/* ═══════════════════════════════════════
+   Panel
+   ═══════════════════════════════════════ */
+function updatePanel(data) {
+  const meta = data.metadata || {};
+  const track = data.track || [];
+  const tags = data.tags || [];
+
+  // Stats
+  const dur = meta.durationSeconds || 0;
+  const h = Math.floor(dur / 3600);
+  const m = Math.floor((dur % 3600) / 60);
+  const s = Math.floor(dur % 60);
+  const durStr = h > 0
+    ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+    : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+
+  const avgAcc = track.length > 0
+    ? (track.reduce((a, p) => a + (p.accuracy || 0), 0) / track.length).toFixed(1)
+    : "—";
+
+  // Distance
+  let dist = 0;
+  for (let i = 1; i < track.length; i++) {
+    dist += haversine(track[i - 1].lat, track[i - 1].lng, track[i].lat, track[i].lng);
+  }
+  const distStr = dist > 1000 ? (dist / 1000).toFixed(2) + " km" : Math.round(dist) + " m";
+
+  document.getElementById("panelTitle").textContent =
+    `Track — ${new Date(meta.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+
+  document.getElementById("statsGrid").innerHTML = `
+    <div class="stat-item"><div class="stat-val">${meta.totalPoints || track.length}</div><div class="stat-lbl">Points</div></div>
+    <div class="stat-item"><div class="stat-val">${durStr}</div><div class="stat-lbl">Duration</div></div>
+    <div class="stat-item"><div class="stat-val">${distStr}</div><div class="stat-lbl">Distance</div></div>
+    <div class="stat-item"><div class="stat-val">${tags.length}</div><div class="stat-lbl">Tags</div></div>
+    <div class="stat-item"><div class="stat-val">&plusmn;${avgAcc} m</div><div class="stat-lbl">Avg Accuracy</div></div>
+    <div class="stat-item"><div class="stat-val">${(track.length / Math.max(dur, 1)).toFixed(1)}/s</div><div class="stat-lbl">Sample Rate</div></div>
+  `;
+
+  // Tags list
+  const tl = document.getElementById("tagsList");
+  if (tags.length === 0) {
+    tl.innerHTML = "";
+    return;
+  }
+
+  tl.innerHTML = `<div class="tags-list-header">Tags</div>` + tags.map(tag => `
+    <div class="tag-row" data-lat="${tag.lat}" data-lng="${tag.lng}" data-id="${tag.id}">
+      <div class="tag-badge">${tag.id}</div>
+      <div class="tag-detail">
+        <div class="tag-detail-time">${formatTS(tag.timestamp)}</div>
+        <div class="tag-detail-coords">${tag.lat != null ? `${tag.lat.toFixed(6)}, ${tag.lng.toFixed(6)}` : "No position"}</div>
+      </div>
+    </div>
+  `).join("");
+
+  tl.querySelectorAll(".tag-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const lat = parseFloat(row.dataset.lat);
+      const lng = parseFloat(row.dataset.lng);
+      if (!isNaN(lat)) {
+        map.flyTo([lat, lng], 18, { duration: 0.5 });
+        // Open popup
+        trackGroup.eachLayer(layer => {
+          if (layer instanceof L.Marker && layer.getLatLng().lat === lat && layer.getLatLng().lng === lng) {
+            layer.openPopup();
+          }
+        });
+      }
+    });
+  });
+}
+
+/* Panel collapse */
+let panelCollapsed = false;
+document.getElementById("panelHeader").addEventListener("click", () => {
+  panelCollapsed = !panelCollapsed;
+  document.getElementById("panelBody").style.display = panelCollapsed ? "none" : "";
+  document.getElementById("panelToggle").innerHTML = panelCollapsed
+    ? '<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>';
+});
+
+/* ═══════════════════════════════════════
+   Utilities
+   ═══════════════════════════════════════ */
+function formatTS(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    + "." + String(d.getMilliseconds()).padStart(3, "0");
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/* ═══════════════════════════════════════
+   File Loading
+   ═══════════════════════════════════════ */
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.track || !Array.isArray(data.track)) {
+        alert("Invalid file: missing 'track' array.");
+        return;
+      }
+      displayTrack(data);
+    } catch (err) {
+      alert("Failed to parse JSON: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Button click
+const fileInput = document.getElementById("fileInput");
+document.getElementById("btnLoad").addEventListener("click", () => fileInput.click());
+document.getElementById("btnLoadEmpty").addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", (e) => {
+  if (e.target.files.length > 0) {
+    loadFile(e.target.files[0]);
+    e.target.value = "";
+  }
+});
+
+// Drag & drop
+const dropzone = document.getElementById("dropzone");
+let dragCounter = 0;
+
+document.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  dragCounter++;
+  dropzone.classList.add("active");
+});
+
+document.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    dropzone.classList.remove("active");
+  }
+});
+
+document.addEventListener("dragover", (e) => e.preventDefault());
+
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  dropzone.classList.remove("active");
+  if (e.dataTransfer.files.length > 0) {
+    loadFile(e.dataTransfer.files[0]);
+  }
+});
+
+/* ═══════════════════════════════════════
+   Auto-load if JSON passed via URL param
+   ═══════════════════════════════════════ */
+const params = new URLSearchParams(window.location.search);
+const jsonUrl = params.get("track");
+if (jsonUrl) {
+  fetch(jsonUrl)
+    .then(r => r.json())
+    .then(data => displayTrack(data))
+    .catch(err => console.warn("Could not load track from URL:", err));
+}
+</script>
+</body>
+</html>
