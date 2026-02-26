@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>CalibrationGPSTracker</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0A0A0A;
+    --dark: #1A1A1A;
+    --mid: #2A2A2A;
+    --gray: #888888;
+    --light: #E0E0E0;
+    --white: #FAFAFA;
+    --red: #E53935;
+    --red-dark: #B71C1C;
+    --yellow: #FDD835;
+    --yellow-dark: #F9A825;
+    --green: #43A047;
+    --radius: 12px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--black);
+    color: var(--white);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--dark);
+    border-bottom: 1px solid var(--mid);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-icon svg { width: 16px; height: 16px; fill: var(--white); }
+
+  .header-actions { display: flex; gap: 8px; }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--mid);
+    background: transparent;
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .icon-btn:active { background: var(--mid); }
+  .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+  /* ── Main ── */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Status Bar ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--dark);
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gray);
+    flex-shrink: 0;
+  }
+
+  .status-dot.acquiring { background: var(--yellow); animation: pulse 1.2s infinite; }
+  .status-dot.active { background: var(--green); }
+  .status-dot.recording { background: var(--red); animation: pulse 0.8s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .status-text { color: var(--gray); }
+  .status-accuracy { margin-left: auto; color: var(--gray); font-variant-numeric: tabular-nums; }
+
+  /* ── Stats Grid ── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--mid);
+    flex-shrink: 0;
+  }
+
+  .stat {
+    background: var(--black);
+    padding: 14px 12px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--gray);
+    margin-top: 2px;
+  }
+
+  /* ── Tags List ── */
+  .tags-section {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 16px;
+  }
+
+  .tags-header {
+    position: sticky;
+    top: 0;
+    background: var(--black);
+    padding: 12px 0 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--gray);
+    z-index: 1;
+  }
+
+  .tag-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--mid);
+    animation: slideIn 0.2s ease-out;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tag-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--red);
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .tag-info { flex: 1; min-width: 0; }
+
+  .tag-time {
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tag-coords {
+    font-size: 12px;
+    color: var(--gray);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tag-delete {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tag-delete:active { background: var(--mid); color: var(--red); }
+  .tag-delete svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--gray);
+    text-align: center;
+    gap: 8px;
+  }
+
+  .empty-state svg { width: 40px; height: 40px; fill: var(--mid); margin-bottom: 4px; }
+  .empty-state p { font-size: 14px; line-height: 1.4; }
+
+  /* ── Controls ── */
+  .controls {
+    padding: 16px;
+    background: var(--dark);
+    border-top: 1px solid var(--mid);
+    display: flex;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    height: 56px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.1s, opacity 0.15s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; pointer-events: none; }
+  .btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+  .btn-record {
+    flex: 1;
+    background: var(--red);
+    color: var(--white);
+  }
+
+  .btn-record.recording {
+    background: var(--white);
+    color: var(--black);
+  }
+
+  .btn-tag {
+    flex: 1;
+    background: var(--yellow);
+    color: var(--black);
+    font-size: 17px;
+  }
+
+  .btn-tag:active { background: var(--yellow-dark); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: calc(100px + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--white);
+    color: var(--black);
+    padding: 10px 20px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--dark);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 360px;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 20px 20px 12px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .modal-body { padding: 0 20px 20px; }
+
+  .modal-body p {
+    font-size: 14px;
+    color: var(--gray);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  .modal-actions {
+    display: flex;
+    border-top: 1px solid var(--mid);
+  }
+
+  .modal-btn {
+    flex: 1;
+    padding: 16px;
+    border: none;
+    background: transparent;
+    color: var(--white);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .modal-btn:active { background: var(--mid); }
+  .modal-btn + .modal-btn { border-left: 1px solid var(--mid); }
+  .modal-btn.primary { color: var(--red); }
+
+  /* ── File List Modal ── */
+  .file-list {
+    max-height: 260px;
+    overflow-y: auto;
+    margin: 0 -20px;
+    padding: 0;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--mid);
+    cursor: pointer;
+  }
+
+  .file-item:active { background: var(--mid); }
+
+  .file-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .file-icon svg { width: 18px; height: 18px; fill: var(--gray); }
+
+  .file-info { flex: 1; min-width: 0; }
+
+  .file-name {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-date { font-size: 12px; color: var(--gray); margin-top: 1px; }
+
+  .file-actions { display: flex; gap: 4px; }
+
+  .file-action-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+
+  .file-action-btn:active { background: var(--mid); }
+  .file-action-btn svg { width: 18px; height: 18px; fill: currentColor; }
+  .file-action-btn.delete:active { color: var(--red); }
+
+  .no-files {
+    padding: 30px 20px;
+    text-align: center;
+    color: var(--gray);
+    font-size: 14px;
+  }
+
+  /* ── Responsive ── */
+  @media (min-height: 700px) {
+    .stat-value { font-size: 30px; }
+    .stat { padding: 18px 12px; }
+    .controls { padding: 20px 16px; }
+    .btn { height: 62px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+    </div>
+    CalibrationGPSTracker
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="btnFiles" aria-label="Saved files">
+      <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ── Status Bar ── -->
+<div class="status-bar">
+  <div class="status-dot" id="statusDot"></div>
+  <span class="status-text" id="statusText">GPS inactive</span>
+  <span class="status-accuracy" id="statusAccuracy"></span>
+</div>
+
+<!-- ── Stats ── -->
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value" id="statPoints">0</div>
+    <div class="stat-label">Points</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="statDuration">00:00</div>
+    <div class="stat-label">Duration</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="statTags">0</div>
+    <div class="stat-label">Tags</div>
+  </div>
+</div>
+
+<!-- ── Tags List ── -->
+<div class="tags-section" id="tagsSection">
+  <div class="empty-state" id="emptyState">
+    <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+    <p>Press <strong>Start Recording</strong> to begin tracking your GPS position. Use the <strong>Tag</strong> button to mark points of interest.</p>
+  </div>
+  <div class="tags-header" id="tagsHeader" style="display:none;">Tags</div>
+  <div id="tagsList"></div>
+</div>
+
+<!-- ── Controls ── -->
+<div class="controls" id="controls">
+  <button class="btn btn-record" id="btnRecord">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    Start Recording
+  </button>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<!-- ── Stop Confirm Modal ── -->
+<div class="modal-overlay" id="modalStop">
+  <div class="modal">
+    <div class="modal-header">Stop Recording?</div>
+    <div class="modal-body">
+      <p>The current track will be saved with all recorded points and tags.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" id="btnStopCancel">Cancel</button>
+      <button class="modal-btn primary" id="btnStopConfirm">Stop &amp; Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Files Modal ── -->
+<div class="modal-overlay" id="modalFiles">
+  <div class="modal">
+    <div class="modal-header">Saved Tracks</div>
+    <div class="modal-body">
+      <div class="file-list" id="fileList"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" id="btnFilesClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Confirm Modal ── -->
+<div class="modal-overlay" id="modalDelete">
+  <div class="modal">
+    <div class="modal-header">Delete Track?</div>
+    <div class="modal-body">
+      <p>This action cannot be undone.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" id="btnDeleteCancel">Cancel</button>
+      <button class="modal-btn primary" id="btnDeleteConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════
+   State
+   ═══════════════════════════════════════════ */
+const state = {
+  recording: false,
+  watchId: null,
+  wakeLock: null,
+  startTime: null,
+  timerInterval: null,
+  pollingInterval: null,
+  track: [],
+  tags: [],
+  lastPosition: null,
+  deleteTarget: null,
+};
+
+/* ═══════════════════════════════════════════
+   DOM refs
+   ═══════════════════════════════════════════ */
+const $ = (id) => document.getElementById(id);
+const statusDot    = $("statusDot");
+const statusText   = $("statusText");
+const statusAccuracy = $("statusAccuracy");
+const statPoints   = $("statPoints");
+const statDuration = $("statDuration");
+const statTags     = $("statTags");
+const tagsSection  = $("tagsSection");
+const tagsHeader   = $("tagsHeader");
+const tagsList     = $("tagsList");
+const emptyState   = $("emptyState");
+const btnRecord    = $("btnRecord");
+const controls     = $("controls");
+const toast        = $("toast");
+const modalStop    = $("modalStop");
+const modalFiles   = $("modalFiles");
+const modalDelete  = $("modalDelete");
+
+/* ═══════════════════════════════════════════
+   Utility
+   ═══════════════════════════════════════════ */
+function formatTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+function formatTimestamp(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    + "." + String(d.getMilliseconds()).padStart(3, "0");
+}
+
+function formatCoords(lat, lng) {
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+function formatDate(ts) {
+  return new Date(ts).toLocaleDateString("en-US", {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+/* ═══════════════════════════════════════════
+   GPS
+   ═══════════════════════════════════════════ */
+const geoOptions = {
+  enableHighAccuracy: true,
+  maximumAge: 0,
+  timeout: 5000,
+};
+
+function positionToPoint(pos) {
+  return {
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    alt: pos.coords.altitude,
+    accuracy: pos.coords.accuracy != null ? Math.round(pos.coords.accuracy * 10) / 10 : null,
+    altAccuracy: pos.coords.altitudeAccuracy != null ? Math.round(pos.coords.altitudeAccuracy * 10) / 10 : null,
+    speed: pos.coords.speed,
+    heading: pos.coords.heading,
+    timestamp: new Date(pos.timestamp).toISOString(),
+  };
+}
+
+function onPosition(pos) {
+  state.lastPosition = pos;
+
+  // Update status
+  statusDot.className = "status-dot" + (state.recording ? " recording" : " active");
+  const acc = pos.coords.accuracy;
+  statusText.textContent = state.recording ? "Recording" : "GPS ready";
+  statusAccuracy.textContent = acc != null ? `\u00B1${acc.toFixed(1)} m` : "";
+
+  if (!state.recording) return;
+
+  const point = positionToPoint(pos);
+
+  // Deduplicate: skip if identical timestamp
+  if (state.track.length > 0 && state.track[state.track.length - 1].timestamp === point.timestamp) return;
+
+  state.track.push(point);
+  statPoints.textContent = state.track.length;
+}
+
+function onPositionError(err) {
+  console.warn("Geolocation error:", err);
+  if (!state.recording) {
+    statusDot.className = "status-dot";
+    statusText.textContent = err.code === 1 ? "Permission denied" : "GPS unavailable";
+    statusAccuracy.textContent = "";
+  }
+}
+
+function startGPS() {
+  if (!("geolocation" in navigator)) {
+    showToast("Geolocation not supported");
+    return false;
+  }
+
+  state.watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, geoOptions);
+
+  // Supplementary polling: force a position read every 800ms
+  // watchPosition fires on position change; this ensures we capture
+  // at least ~1.25 points/second even when standing still
+  state.pollingInterval = setInterval(() => {
+    if (state.recording) {
+      navigator.geolocation.getCurrentPosition(onPosition, () => {}, geoOptions);
+    }
+  }, 800);
+
+  statusDot.className = "status-dot acquiring";
+  statusText.textContent = "Acquiring GPS\u2026";
+  return true;
+}
+
+function stopGPS() {
+  if (state.watchId != null) {
+    navigator.geolocation.clearWatch(state.watchId);
+    state.watchId = null;
+  }
+  if (state.pollingInterval != null) {
+    clearInterval(state.pollingInterval);
+    state.pollingInterval = null;
+  }
+  statusDot.className = "status-dot";
+  statusText.textContent = "GPS inactive";
+  statusAccuracy.textContent = "";
+}
+
+/* ═══════════════════════════════════════════
+   Wake Lock
+   ═══════════════════════════════════════════ */
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      state.wakeLock = await navigator.wakeLock.request("screen");
+      state.wakeLock.addEventListener("release", () => { state.wakeLock = null; });
+    }
+  } catch (_) { /* non-critical */ }
+}
+
+function releaseWakeLock() {
+  if (state.wakeLock) {
+    state.wakeLock.release();
+    state.wakeLock = null;
+  }
+}
+
+/* Re-acquire wake lock when page becomes visible again */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && state.recording) {
+    requestWakeLock();
+  }
+});
+
+/* ═══════════════════════════════════════════
+   Timer
+   ═══════════════════════════════════════════ */
+function startTimer() {
+  state.startTime = Date.now();
+  state.timerInterval = setInterval(() => {
+    const elapsed = (Date.now() - state.startTime) / 1000;
+    statDuration.textContent = formatTime(elapsed);
+  }, 200);
+}
+
+function stopTimer() {
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+}
+
+/* ═══════════════════════════════════════════
+   Recording
+   ═══════════════════════════════════════════ */
+function startRecording() {
+  if (!startGPS()) return;
+
+  state.recording = true;
+  state.track = [];
+  state.tags = [];
+
+  // Reset UI
+  statPoints.textContent = "0";
+  statTags.textContent = "0";
+  tagsList.innerHTML = "";
+  tagsHeader.style.display = "none";
+  emptyState.style.display = "none";
+
+  startTimer();
+  requestWakeLock();
+
+  // Update controls
+  controls.innerHTML = `
+    <button class="btn btn-record recording" id="btnStop">
+      <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      Stop
+    </button>
+    <button class="btn btn-tag" id="btnTag">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>
+      Tag
+    </button>
+  `;
+
+  $("btnStop").addEventListener("click", confirmStop);
+  $("btnTag").addEventListener("click", addTag);
+
+  vibrate(50);
+  showToast("Recording started");
+}
+
+function confirmStop() {
+  modalStop.classList.add("open");
+}
+
+function stopRecording() {
+  state.recording = false;
+  stopTimer();
+  stopGPS();
+  releaseWakeLock();
+
+  const trackData = buildJSON();
+  saveTrack(trackData);
+
+  // Reset controls
+  controls.innerHTML = `
+    <button class="btn btn-record" id="btnRecord">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      Start Recording
+    </button>
+  `;
+  $("btnRecord").addEventListener("click", startRecording);
+
+  statDuration.textContent = "00:00";
+  statPoints.textContent = "0";
+  statTags.textContent = "0";
+  tagsList.innerHTML = "";
+  tagsHeader.style.display = "none";
+  emptyState.style.display = "";
+
+  vibrate([50, 50, 50]);
+  showToast(`Track saved \u2022 ${trackData.track.length} pts, ${trackData.tags.length} tags`);
+}
+
+/* ═══════════════════════════════════════════
+   Tags
+   ═══════════════════════════════════════════ */
+function addTag() {
+  const now = new Date();
+  const ts = now.toISOString();
+
+  let lat = null, lng = null, alt = null, pointIndex = null;
+
+  // Link to closest track point
+  if (state.track.length > 0) {
+    pointIndex = state.track.length - 1;
+    const p = state.track[pointIndex];
+    lat = p.lat;
+    lng = p.lng;
+    alt = p.alt;
+  } else if (state.lastPosition) {
+    lat = state.lastPosition.coords.latitude;
+    lng = state.lastPosition.coords.longitude;
+    alt = state.lastPosition.coords.altitude;
+  }
+
+  const tag = {
+    id: state.tags.length + 1,
+    timestamp: ts,
+    pointIndex,
+    lat,
+    lng,
+    alt,
+  };
+
+  state.tags.push(tag);
+  statTags.textContent = state.tags.length;
+
+  // Render
+  tagsHeader.style.display = "";
+  const el = document.createElement("div");
+  el.className = "tag-item";
+  el.dataset.tagId = tag.id;
+  el.innerHTML = `
+    <div class="tag-number">${tag.id}</div>
+    <div class="tag-info">
+      <div class="tag-time">${formatTimestamp(now)}</div>
+      <div class="tag-coords">${lat != null ? formatCoords(lat, lng) : "No position"}</div>
+    </div>
+    <button class="tag-delete" aria-label="Delete tag">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  `;
+  el.querySelector(".tag-delete").addEventListener("click", () => removeTag(tag.id, el));
+  tagsList.prepend(el);
+
+  vibrate(30);
+  showToast(`Tag #${tag.id} added`);
+}
+
+function removeTag(id, el) {
+  state.tags = state.tags.filter(t => t.id !== id);
+  statTags.textContent = state.tags.length;
+  el.remove();
+  if (state.tags.length === 0) tagsHeader.style.display = "none";
+}
+
+/* ═══════════════════════════════════════════
+   JSON Builder
+   ═══════════════════════════════════════════ */
+function buildJSON() {
+  const endTime = new Date().toISOString();
+  const durationSec = state.startTime ? (Date.now() - state.startTime) / 1000 : 0;
+
+  return {
+    version: "1.0",
+    generator: "CalibrationGPSTracker",
+    metadata: {
+      startTime: state.track.length > 0 ? state.track[0].timestamp : new Date(state.startTime).toISOString(),
+      endTime,
+      durationSeconds: Math.round(durationSec * 100) / 100,
+      totalPoints: state.track.length,
+      totalTags: state.tags.length,
+      device: navigator.userAgent,
+    },
+    track: state.track,
+    tags: state.tags,
+  };
+}
+
+/* ═══════════════════════════════════════════
+   Storage
+   ═══════════════════════════════════════════ */
+const STORAGE_KEY = "tracktag_tracks";
+
+function getStoredTracks() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch { return []; }
+}
+
+function setStoredTracks(tracks) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
+}
+
+function saveTrack(data) {
+  const tracks = getStoredTracks();
+  const entry = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: `Track ${formatDate(data.metadata.startTime)}`,
+    savedAt: new Date().toISOString(),
+    points: data.track.length,
+    tags: data.tags.length,
+    duration: data.metadata.durationSeconds,
+    data,
+  };
+  tracks.unshift(entry);
+  setStoredTracks(tracks);
+}
+
+function deleteTrack(id) {
+  const tracks = getStoredTracks().filter(t => t.id !== id);
+  setStoredTracks(tracks);
+}
+
+/* ═══════════════════════════════════════════
+   Share / Download
+   ═══════════════════════════════════════════ */
+function downloadJSON(data, filename) {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function shareJSON(data, filename) {
+  const json = JSON.stringify(data, null, 2);
+  const file = new File([json], filename, { type: "application/json" });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        title: "GPS Track",
+        files: [file],
+      });
+      return true;
+    } catch (e) {
+      if (e.name === "AbortError") return true; // user cancelled, not an error
+    }
+  }
+
+  // Fallback: download
+  downloadJSON(data, filename);
+  return true;
+}
+
+/* ═══════════════════════════════════════════
+   Files Modal
+   ═══════════════════════════════════════════ */
+function renderFileList() {
+  const tracks = getStoredTracks();
+  const list = $("fileList");
+
+  if (tracks.length === 0) {
+    list.innerHTML = '<div class="no-files">No saved tracks yet.</div>';
+    return;
+  }
+
+  list.innerHTML = tracks.map(t => `
+    <div class="file-item" data-id="${t.id}">
+      <div class="file-icon">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+      </div>
+      <div class="file-info">
+        <div class="file-name">${t.name}</div>
+        <div class="file-date">${t.points} pts \u2022 ${t.tags} tags \u2022 ${formatTime(t.duration)}</div>
+      </div>
+      <div class="file-actions">
+        <button class="file-action-btn share" aria-label="Share" data-id="${t.id}">
+          <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+        </button>
+        <button class="file-action-btn delete" aria-label="Delete" data-id="${t.id}">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join("");
+
+  // Event delegation
+  list.querySelectorAll(".file-action-btn.share").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const track = getStoredTracks().find(t => t.id === id);
+      if (track) {
+        const filename = `track_${id}.json`;
+        shareJSON(track.data, filename);
+      }
+    });
+  });
+
+  list.querySelectorAll(".file-action-btn.delete").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.deleteTarget = btn.dataset.id;
+      modalDelete.classList.add("open");
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════
+   Event Listeners
+   ═══════════════════════════════════════════ */
+btnRecord.addEventListener("click", startRecording);
+
+$("btnFiles").addEventListener("click", () => {
+  renderFileList();
+  modalFiles.classList.add("open");
+});
+
+$("btnStopCancel").addEventListener("click", () => modalStop.classList.remove("open"));
+$("btnStopConfirm").addEventListener("click", () => {
+  modalStop.classList.remove("open");
+  stopRecording();
+});
+
+$("btnFilesClose").addEventListener("click", () => modalFiles.classList.remove("open"));
+
+$("btnDeleteCancel").addEventListener("click", () => {
+  state.deleteTarget = null;
+  modalDelete.classList.remove("open");
+});
+
+$("btnDeleteConfirm").addEventListener("click", () => {
+  if (state.deleteTarget) {
+    deleteTrack(state.deleteTarget);
+    state.deleteTarget = null;
+  }
+  modalDelete.classList.remove("open");
+  renderFileList();
+});
+
+// Close modals on overlay tap
+[modalStop, modalFiles, modalDelete].forEach(modal => {
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.remove("open");
+  });
+});
+
+// Prevent accidental page leave during recording
+window.addEventListener("beforeunload", (e) => {
+  if (state.recording) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+
+/* ═══════════════════════════════════════════
+   Init
+   ═══════════════════════════════════════════ */
+// Check geolocation support on load
+if (!("geolocation" in navigator)) {
+  statusText.textContent = "Geolocation not supported";
+  btnRecord.disabled = true;
+}
+
+/* ═══════════════════════════════════════════
+   Service Worker — enables full offline use
+   ═══════════════════════════════════════════ */
+if ("serviceWorker" in navigator) {
+  const SW_CODE = `
+    const CACHE = "calibgps-v1";
+    self.addEventListener("install", e => {
+      e.waitUntil(
+        caches.open(CACHE).then(c => c.addAll(["./"])).then(() => self.skipWaiting())
+      );
+    });
+    self.addEventListener("activate", e => {
+      e.waitUntil(
+        caches.keys().then(keys =>
+          Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
+      );
+    });
+    self.addEventListener("fetch", e => {
+      e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request))
+      );
+    });
+  `;
+  const blob = new Blob([SW_CODE], { type: "application/javascript" });
+  const swURL = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swURL).catch(() => {});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "CalibrationGPSTracker - GPS Track Recorder",
+  "short_name": "CalibrationGPSTracker",
+  "description": "Record GPS tracks with precision tagging",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0A0A",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='96' fill='%230A0A0A'/><circle cx='256' cy='220' r='120' fill='%23E53935'/><path d='M256 100c-66.3 0-120 53.7-120 120 0 90 120 222 120 222s120-132 120-222c0-66.3-53.7-120-120-120zm0 163a43 43 0 110-86 43 43 0 010 86z' fill='white'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
